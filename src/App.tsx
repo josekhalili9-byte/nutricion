@@ -33,9 +33,16 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentResult, setCurrentResult] = useState<FoodAnalysis | null>(null);
   const [cameraError, setCameraError] = useState('');
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && mediaStream) {
+      videoRef.current.srcObject = mediaStream;
+    }
+  }, [isCameraActive, mediaStream]);
 
   // Load history from local storage on mount
   useEffect(() => {
@@ -60,10 +67,8 @@ export default function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' } 
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsCameraActive(true);
-      }
+      setMediaStream(stream);
+      setIsCameraActive(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
       setCameraError('No se pudo acceder a la cámara. Por favor, otorga los permisos necesarios.');
@@ -71,9 +76,11 @@ export default function App() {
   };
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      setMediaStream(null);
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
@@ -82,6 +89,7 @@ export default function App() {
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
+      if (video.videoWidth === 0 || video.videoHeight === 0) return;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -110,7 +118,7 @@ export default function App() {
       const base64Data = imageDataUrl.split(',')[1];
       
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-flash-preview',
         contents: [
           {
             inlineData: {
@@ -223,14 +231,14 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 flex flex-col">
+    <div className="min-h-screen bg-black text-white font-sans pb-20 flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10 px-4 py-4 flex justify-between items-center">
+      <header className="bg-[#111] shadow-sm sticky top-0 z-10 px-4 py-4 flex justify-between items-center border-b border-[#222]">
         <div className="flex items-center gap-2">
           <div className="bg-emerald-500 p-2 rounded-xl">
-            <Activity className="w-6 h-6 text-white" />
+            <Activity className="w-6 h-6 text-black" />
           </div>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold text-emerald-400">
             FoodScan AI
           </h1>
         </div>
@@ -239,7 +247,7 @@ export default function App() {
             if (isAdmin) setActiveTab('admin');
             else setShowAdminLogin(true);
           }}
-          className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+          className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-[#222] rounded-full transition-colors"
         >
           <Settings className="w-5 h-5" />
         </button>
@@ -260,8 +268,8 @@ export default function App() {
               {!capturedImage ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-6">
                   <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-semibold text-slate-800">Descubre lo que comes</h2>
-                    <p className="text-slate-500">Apunta la cámara a tu comida para analizar su valor nutricional al instante.</p>
+                    <h2 className="text-2xl font-semibold text-white">Descubre lo que comes</h2>
+                    <p className="text-slate-400">Apunta la cámara a tu comida para analizar su valor nutricional al instante.</p>
                   </div>
 
                   {isCameraActive ? (
@@ -295,15 +303,15 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    <div className="w-full aspect-[3/4] bg-slate-100 rounded-3xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center p-6 text-center gap-4">
-                      <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center">
-                        <Camera className="w-10 h-10 text-emerald-600" />
+                    <div className="w-full aspect-[3/4] bg-[#111] rounded-3xl border-2 border-dashed border-[#333] flex flex-col items-center justify-center p-6 text-center gap-4">
+                      <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                        <Camera className="w-10 h-10 text-emerald-500" />
                       </div>
-                      <p className="text-slate-500">La cámara está inactiva</p>
+                      <p className="text-slate-400">La cámara está inactiva</p>
                       {cameraError && <p className="text-red-500 text-sm">{cameraError}</p>}
                       <button 
                         onClick={startCamera}
-                        className="mt-4 px-8 py-4 bg-slate-900 text-white rounded-2xl font-medium shadow-lg hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-2"
+                        className="mt-4 px-8 py-4 bg-emerald-500 text-black rounded-2xl font-medium shadow-lg hover:bg-emerald-400 transition-all active:scale-95 flex items-center gap-2"
                       >
                         <Camera className="w-5 h-5" />
                         Escanear alimento
@@ -321,8 +329,8 @@ export default function App() {
                     </div>
                   </div>
                   <div className="text-center space-y-2">
-                    <h3 className="text-xl font-semibold text-slate-800">Analizando alimento...</h3>
-                    <p className="text-slate-500">La IA está calculando los nutrientes</p>
+                    <h3 className="text-xl font-semibold text-white">Analizando alimento...</h3>
+                    <p className="text-slate-400">La IA está calculando los nutrientes</p>
                   </div>
                 </div>
               ) : currentResult ? (
@@ -340,7 +348,7 @@ export default function App() {
                   <div className="space-y-6">
                     <div>
                       <div className="flex justify-between items-start mb-2">
-                        <h2 className="text-3xl font-bold text-slate-900 capitalize">{currentResult.name}</h2>
+                        <h2 className="text-3xl font-bold text-white capitalize">{currentResult.name}</h2>
                         {getStatusIcon(currentResult.status)}
                       </div>
                       <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(currentResult.status)}`}>
@@ -348,79 +356,79 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Flame className="w-5 h-5 text-orange-500" />
+                    <div className="bg-[#111] p-5 rounded-3xl shadow-sm border border-[#222]">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                        <Flame className="w-5 h-5 text-emerald-500" />
                         Calorías: {currentResult.calories} kcal
                       </h3>
                       
                       <div className="space-y-4">
                         <div className="space-y-1">
                           <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 flex items-center gap-1"><Activity className="w-4 h-4 text-blue-500"/> Proteínas</span>
-                            <span className="font-medium">{currentResult.protein}g</span>
+                            <span className="text-slate-400 flex items-center gap-1"><Activity className="w-4 h-4 text-emerald-400"/> Proteínas</span>
+                            <span className="font-medium text-white">{currentResult.protein}g</span>
                           </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-[#222] rounded-full overflow-hidden">
                             <motion.div 
                               initial={{ width: 0 }} 
                               animate={{ width: `${Math.min((currentResult.protein / 50) * 100, 100)}%` }} 
-                              className="h-full bg-blue-500 rounded-full"
+                              className="h-full bg-emerald-500 rounded-full"
                             />
                           </div>
                         </div>
 
                         <div className="space-y-1">
                           <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 flex items-center gap-1"><Wheat className="w-4 h-4 text-amber-500"/> Carbohidratos</span>
-                            <span className="font-medium">{currentResult.carbs}g</span>
+                            <span className="text-slate-400 flex items-center gap-1"><Wheat className="w-4 h-4 text-emerald-400"/> Carbohidratos</span>
+                            <span className="font-medium text-white">{currentResult.carbs}g</span>
                           </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-[#222] rounded-full overflow-hidden">
                             <motion.div 
                               initial={{ width: 0 }} 
                               animate={{ width: `${Math.min((currentResult.carbs / 100) * 100, 100)}%` }} 
-                              className="h-full bg-amber-500 rounded-full"
+                              className="h-full bg-emerald-500 rounded-full"
                             />
                           </div>
                         </div>
 
                         <div className="space-y-1">
                           <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 flex items-center gap-1"><Droplet className="w-4 h-4 text-yellow-500"/> Grasas</span>
-                            <span className="font-medium">{currentResult.fat}g</span>
+                            <span className="text-slate-400 flex items-center gap-1"><Droplet className="w-4 h-4 text-emerald-400"/> Grasas</span>
+                            <span className="font-medium text-white">{currentResult.fat}g</span>
                           </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-[#222] rounded-full overflow-hidden">
                             <motion.div 
                               initial={{ width: 0 }} 
                               animate={{ width: `${Math.min((currentResult.fat / 50) * 100, 100)}%` }} 
-                              className="h-full bg-yellow-500 rounded-full"
+                              className="h-full bg-emerald-500 rounded-full"
                             />
                           </div>
                         </div>
                         
                         <div className="space-y-1">
                           <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 flex items-center gap-1"><Activity className="w-4 h-4 text-purple-500"/> Azúcar</span>
-                            <span className="font-medium">{currentResult.sugar}g</span>
+                            <span className="text-slate-400 flex items-center gap-1"><Activity className="w-4 h-4 text-emerald-400"/> Azúcar</span>
+                            <span className="font-medium text-white">{currentResult.sugar}g</span>
                           </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-[#222] rounded-full overflow-hidden">
                             <motion.div 
                               initial={{ width: 0 }} 
                               animate={{ width: `${Math.min((currentResult.sugar / 50) * 100, 100)}%` }} 
-                              className="h-full bg-purple-500 rounded-full"
+                              className="h-full bg-emerald-500 rounded-full"
                             />
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100">
-                      <h4 className="font-semibold text-blue-900 mb-2">Recomendación</h4>
-                      <p className="text-blue-800 text-sm leading-relaxed">{currentResult.recommendation}</p>
+                    <div className="bg-emerald-900/20 p-5 rounded-3xl border border-emerald-500/30">
+                      <h4 className="font-semibold text-emerald-400 mb-2">Recomendación</h4>
+                      <p className="text-emerald-100 text-sm leading-relaxed">{currentResult.recommendation}</p>
                     </div>
 
                     <button 
                       onClick={resetScanner}
-                      className="w-full py-4 bg-slate-900 text-white rounded-2xl font-medium shadow-lg hover:bg-slate-800 transition-all active:scale-95"
+                      className="w-full py-4 bg-emerald-500 text-black rounded-2xl font-medium shadow-lg hover:bg-emerald-400 transition-all active:scale-95"
                     >
                       Escanear otro alimento
                     </button>
@@ -442,27 +450,27 @@ export default function App() {
               <h2 className="text-2xl font-bold mb-6">Historial</h2>
               
               {history.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-slate-500">
-                  <History className="w-16 h-16 text-slate-300" />
+                <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-slate-400">
+                  <History className="w-16 h-16 text-[#333]" />
                   <p>Aún no has escaneado ningún alimento.</p>
                 </div>
               ) : (
                 <div className="space-y-4 pb-6">
                   {history.map((item) => (
-                    <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-4 items-center">
+                    <div key={item.id} className="bg-[#111] p-4 rounded-2xl shadow-sm border border-[#222] flex gap-4 items-center">
                       <img src={item.imageUrl} alt={item.name} className="w-16 h-16 rounded-xl object-cover" />
                       <div className="flex-1">
-                        <h3 className="font-semibold capitalize text-slate-900">{item.name}</h3>
-                        <p className="text-sm text-slate-500">{item.calories} kcal</p>
+                        <h3 className="font-semibold capitalize text-white">{item.name}</h3>
+                        <p className="text-sm text-slate-400">{item.calories} kcal</p>
                         <div className="flex items-center gap-1 mt-1">
                           <div className={`w-2 h-2 rounded-full ${
                             item.status === 'saludable' ? 'bg-green-500' : 
                             item.status === 'moderado' ? 'bg-yellow-500' : 'bg-red-500'
                           }`} />
-                          <span className="text-xs text-slate-500 capitalize">{item.status}</span>
+                          <span className="text-xs text-slate-400 capitalize">{item.status}</span>
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-slate-300" />
+                      <ChevronRight className="w-5 h-5 text-[#444]" />
                     </div>
                   ))}
                 </div>
@@ -481,37 +489,37 @@ export default function App() {
             >
               <h2 className="text-2xl font-bold">Aprende</h2>
               
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center mb-4">
-                  <Flame className="w-6 h-6 text-orange-500" />
+              <div className="bg-[#111] p-6 rounded-3xl shadow-sm border border-[#222]">
+                <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center mb-4">
+                  <Flame className="w-6 h-6 text-emerald-500" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">¿Qué son las calorías?</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">
+                <h3 className="text-lg font-semibold mb-2 text-white">¿Qué son las calorías?</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
                   Las calorías son la energía que los alimentos proporcionan a tu cuerpo. Consumir más de las que quemas lleva al aumento de peso, mientras que consumir menos ayuda a perderlo.
                 </p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mb-4">
-                  <Activity className="w-6 h-6 text-blue-500" />
+              <div className="bg-[#111] p-6 rounded-3xl shadow-sm border border-[#222]">
+                <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center mb-4">
+                  <Activity className="w-6 h-6 text-emerald-500" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Macronutrientes</h3>
-                <ul className="space-y-3 text-sm text-slate-600">
+                <h3 className="text-lg font-semibold mb-2 text-white">Macronutrientes</h3>
+                <ul className="space-y-3 text-sm text-slate-400">
                   <li className="flex gap-2">
-                    <strong className="text-slate-900">Proteínas:</strong> Construyen y reparan tejidos.
+                    <strong className="text-emerald-400">Proteínas:</strong> Construyen y reparan tejidos.
                   </li>
                   <li className="flex gap-2">
-                    <strong className="text-slate-900">Carbohidratos:</strong> Principal fuente de energía.
+                    <strong className="text-emerald-400">Carbohidratos:</strong> Principal fuente de energía.
                   </li>
                   <li className="flex gap-2">
-                    <strong className="text-slate-900">Grasas:</strong> Esenciales para hormonas y absorción de vitaminas.
+                    <strong className="text-emerald-400">Grasas:</strong> Esenciales para hormonas y absorción de vitaminas.
                   </li>
                 </ul>
               </div>
 
-              <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
-                <h3 className="text-lg font-semibold text-emerald-900 mb-3">Consejos Saludables</h3>
-                <ul className="space-y-2 text-sm text-emerald-800 list-disc list-inside">
+              <div className="bg-emerald-900/20 p-6 rounded-3xl border border-emerald-500/30">
+                <h3 className="text-lg font-semibold text-emerald-400 mb-3">Consejos Saludables</h3>
+                <ul className="space-y-2 text-sm text-emerald-100 list-disc list-inside">
                   <li>Bebe al menos 2 litros de agua al día.</li>
                   <li>Prioriza alimentos enteros sobre procesados.</li>
                   <li>Come porciones adecuadas.</li>
@@ -531,25 +539,25 @@ export default function App() {
               className="p-4 h-full flex flex-col gap-6 pb-6"
             >
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Panel Admin</h2>
+                <h2 className="text-2xl font-bold text-white">Panel Admin</h2>
                 <button 
                   onClick={() => setIsAdmin(false)}
-                  className="text-sm text-slate-500 hover:text-slate-800"
+                  className="text-sm text-slate-400 hover:text-emerald-400"
                 >
                   Cerrar Sesión
                 </button>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <h3 className="font-semibold mb-4">Estadísticas</h3>
+              <div className="bg-[#111] p-6 rounded-3xl shadow-sm border border-[#222]">
+                <h3 className="font-semibold mb-4 text-white">Estadísticas</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-2xl">
-                    <p className="text-slate-500 text-sm">Total Escaneos</p>
-                    <p className="text-2xl font-bold">{history.length}</p>
+                  <div className="bg-[#222] p-4 rounded-2xl">
+                    <p className="text-slate-400 text-sm">Total Escaneos</p>
+                    <p className="text-2xl font-bold text-white">{history.length}</p>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-2xl">
-                    <p className="text-slate-500 text-sm">Saludables</p>
-                    <p className="text-2xl font-bold text-green-600">
+                  <div className="bg-[#222] p-4 rounded-2xl">
+                    <p className="text-slate-400 text-sm">Saludables</p>
+                    <p className="text-2xl font-bold text-emerald-400">
                       {history.filter(h => h.status === 'saludable').length}
                     </p>
                   </div>
@@ -558,10 +566,10 @@ export default function App() {
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-semibold">Gestión de Historial</h3>
+                  <h3 className="font-semibold text-white">Gestión de Historial</h3>
                   <button 
                     onClick={clearAllHistory}
-                    className="text-sm text-red-500 hover:text-red-700 flex items-center gap-1"
+                    className="text-sm text-red-500 hover:text-red-400 flex items-center gap-1"
                   >
                     <Trash2 className="w-4 h-4" />
                     Borrar Todo
@@ -569,19 +577,19 @@ export default function App() {
                 </div>
                 
                 {history.map((item) => (
-                  <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-4 items-center">
+                  <div key={item.id} className="bg-[#111] p-4 rounded-2xl shadow-sm border border-[#222] flex gap-4 items-center">
                     <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover" />
                     <div className="flex-1">
-                      <h4 className="font-medium capitalize text-sm">{item.name}</h4>
-                      <p className="text-xs text-slate-500">{new Date(item.date).toLocaleDateString()}</p>
+                      <h4 className="font-medium capitalize text-sm text-white">{item.name}</h4>
+                      <p className="text-xs text-slate-400">{new Date(item.date).toLocaleDateString()}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg">
+                      <button className="p-2 text-emerald-500 hover:bg-emerald-500/20 rounded-lg">
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={() => deleteHistoryItem(item.id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                        className="p-2 text-red-500 hover:bg-red-500/20 rounded-lg"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -607,22 +615,22 @@ export default function App() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white p-6 rounded-3xl w-full max-w-sm shadow-2xl"
+              className="bg-[#111] p-6 rounded-3xl w-full max-w-sm shadow-2xl border border-[#222]"
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">Acceso Admin</h3>
-                <button onClick={() => { setShowAdminLogin(false); setAdminError(''); }} className="text-slate-400 hover:text-slate-600">
+                <h3 className="text-xl font-bold text-white">Acceso Admin</h3>
+                <button onClick={() => { setShowAdminLogin(false); setAdminError(''); }} className="text-slate-400 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <form onSubmit={handleAdminLogin} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">PIN de acceso</label>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">PIN de acceso</label>
                   <input 
                     type="password" 
                     value={adminPin}
                     onChange={(e) => setAdminPin(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-3 bg-[#222] border border-[#333] text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     placeholder="Ingresa el PIN"
                     autoFocus
                   />
@@ -630,7 +638,7 @@ export default function App() {
                 {adminError && <p className="text-red-500 text-sm">{adminError}</p>}
                 <button 
                   type="submit"
-                  className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition"
+                  className="w-full py-3 bg-emerald-500 text-black rounded-xl font-medium hover:bg-emerald-400 transition"
                 >
                   Ingresar
                 </button>
@@ -641,27 +649,27 @@ export default function App() {
       </AnimatePresence>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 pb-safe z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#111] border-t border-[#222] pb-safe z-40">
         <div className="max-w-md mx-auto flex justify-around p-2">
           <button 
             onClick={() => setActiveTab('scanner')}
-            className={`flex flex-col items-center p-2 w-20 rounded-xl transition-colors ${activeTab === 'scanner' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`flex flex-col items-center p-2 w-20 rounded-xl transition-colors ${activeTab === 'scanner' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
           >
-            <Camera className={`w-6 h-6 mb-1 ${activeTab === 'scanner' ? 'fill-emerald-100' : ''}`} />
+            <Camera className={`w-6 h-6 mb-1 ${activeTab === 'scanner' ? 'fill-emerald-900/50' : ''}`} />
             <span className="text-[10px] font-medium">Escanear</span>
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`flex flex-col items-center p-2 w-20 rounded-xl transition-colors ${activeTab === 'history' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`flex flex-col items-center p-2 w-20 rounded-xl transition-colors ${activeTab === 'history' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
           >
-            <History className={`w-6 h-6 mb-1 ${activeTab === 'history' ? 'fill-emerald-100' : ''}`} />
+            <History className={`w-6 h-6 mb-1 ${activeTab === 'history' ? 'fill-emerald-900/50' : ''}`} />
             <span className="text-[10px] font-medium">Historial</span>
           </button>
           <button 
             onClick={() => setActiveTab('learn')}
-            className={`flex flex-col items-center p-2 w-20 rounded-xl transition-colors ${activeTab === 'learn' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`flex flex-col items-center p-2 w-20 rounded-xl transition-colors ${activeTab === 'learn' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
           >
-            <BookOpen className={`w-6 h-6 mb-1 ${activeTab === 'learn' ? 'fill-emerald-100' : ''}`} />
+            <BookOpen className={`w-6 h-6 mb-1 ${activeTab === 'learn' ? 'fill-emerald-900/50' : ''}`} />
             <span className="text-[10px] font-medium">Aprende</span>
           </button>
         </div>
