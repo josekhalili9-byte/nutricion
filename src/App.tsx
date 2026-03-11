@@ -3,8 +3,6 @@ import { Camera, History, BookOpen, Settings, X, CheckCircle, AlertTriangle, XCi
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 type HealthStatus = 'saludable' | 'moderado' | 'poco saludable';
 
 interface FoodAnalysis {
@@ -101,6 +99,14 @@ export default function App() {
   const analyzeFood = async (imageDataUrl: string) => {
     setIsAnalyzing(true);
     try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        alert("Error: No se encontró la clave de API de Gemini. Asegúrate de configurarla en las variables de entorno de Vercel (GEMINI_API_KEY).");
+        setCapturedImage(null);
+        return;
+      }
+      
+      const ai = new GoogleGenAI({ apiKey });
       const base64Data = imageDataUrl.split(',')[1];
       
       const response = await ai.models.generateContent({
